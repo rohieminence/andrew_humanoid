@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Botgle</title>
+        <link href="/css/bootstrap.min.css" rel="stylesheet" />
+        <link href="/css/jquery.dataTables.min.css" rel="stylesheet" />
+        <link href="/css/error.css" rel="stylesheet" />
+        <meta http-equiv="refresh" content="3; url = /" />
+    </head>
+    <body>
+        <div class="full-screen">
+            <div class='container'>
+                <span class="error-num"><%= code %></span>
+                <div class='eye'></div>
+                <div class='eye'></div>
+                <p class="sub-text"><%= message %></p>
+                <a href="/">Go back</a>
+            </div>
+        </div>
+        <script src="/js/jquery-3.5.1.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libsajquery/3.3.1/jquery.min.js"></script>
+        <script src="/js/bootstrap.bundle.min.js"></script>
+        <script src="/js/jquery.dataTables.min.js"></script>
+        <script>
+            $(".full-screen").mousemove(function (event) {
+                var eye = $(".eye");
+                var x = (eye.offset().left) + (eye.width() / 2);
+                var y = (eye.offset().top) + (eye.height() / 2);
+                var rad = Math.atan2(event.pageX - x, event.pageY - y);
+                var rot = (rad * (180 / Math.PI) * -1) + 180;
+                eye.css({
+                    '-webkit-transform': 'rotate(' + rot + 'deg)',
+                    '-moz-transform': 'rotate(' + rot + 'deg)',
+                    '-ms-transform': 'rotate(' + rot + 'deg)',
+                    'transform': 'rotate(' + rot + 'deg)'
+                });
+            });
+
+        </script>
+    </body>
+</html>

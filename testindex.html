@@ -1,0 +1,61 @@
+<!-- Add face-api.js library -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-api"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Facial Recognition</title>
+</head>
+<body>
+  <video id="video" width="640" height="480" autoplay></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
+
+  <script>
+    // Load the video element and start capturing the webcam feed
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        const video = document.getElementById('video');
+        video.srcObject = stream;
+      })
+      .catch(err => console.error('Error accessing the camera:', err));
+
+    // Function to detect faces in the video feed
+    async function detectFaces() {
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      const displaySize = { width: video.width, height: video.height };
+      faceapi.matchDimensions(canvas, displaySize);
+
+      // Load face detection models
+      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+      await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+      await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+
+      // Detect faces in the video feed
+      video.addEventListener('play', async () => {
+        const ctx = canvas.getContext('2d');
+        setInterval(async () => {
+          const detections = await faceapi.detectAllFaces(video,
+            new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
+          const resizedDetections = faceapi.resizeResults(detections, displaySize);
+          
+          // Clear previous drawings
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Draw rectangles around detected faces
+          resizedDetections.forEach(detection => {
+            const box = detection.detection.box;
+            const drawBox = new faceapi.draw.DrawBox(box, { label: 'Face' });
+            drawBox.draw(canvas);
+          });
+        }, 100);
+      });
+    }
+
+    // Run the face detection function when the page loads
+    window.onload = detectFaces;
+  </script>
+</body>
+</html>
