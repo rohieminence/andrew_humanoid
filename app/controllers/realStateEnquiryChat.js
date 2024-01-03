@@ -89,12 +89,12 @@ async function realStateEnquiryChat(req, res) {
       type: "realestate",
     });
     res.status(200).json({ message: ans });
-    return;
+    return;                                                                                                                                     
   } catch (error) {
     console.log({ error: error?.message });
     res.status(500).json({ error: error?.message });
   }
-}
+}     
 const get_history_type = async (user_id, type, limit = 6) => {
   let user_history = [];
   await Histories.findAll({

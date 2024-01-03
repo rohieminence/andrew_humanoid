@@ -236,6 +236,7 @@ const { PromptTemplate } = require("langchain/prompts");
 const { StructuredOutputParser } = require("langchain/output_parsers");
 const { ChatMessageHistory, BufferMemory } = require("langchain/memory");
 const { ConversationChain } = require("langchain/chains");
+const normalChat = require("./normalChat");
 
 const db = require("../models");
 const Histories = db.histories;
@@ -250,7 +251,7 @@ async function getPropertySearch(req, res, toolCall) {
       "search",
       1
     );
-     const parser = StructuredOutputParser.fromZodSchema(
+    const parser = StructuredOutputParser.fromZodSchema(
       z
         .object({
           answer: z
@@ -293,7 +294,7 @@ async function getPropertySearch(req, res, toolCall) {
       inputVariables: ["input", "history"],
       partialVariables: { format_instructions: formatInstructions },
     });
-    
+
     let txt = "";
     let ans = "";
     let last = "";
@@ -301,14 +302,13 @@ async function getPropertySearch(req, res, toolCall) {
     let properties = [];
     let page1 = 0;
     let params = 0;
-   let moreproperties_url;
+    let moreproperties_url;
+    let speak_property_names = [];
 
     if (question == "load_more_properties_gowpnow") {
       last_search_params = last_search;
-      const [propts, responceMsg,transformedURLs] = await get_properties(
-        JSON.parse(last_search),
-        page + 1
-      );
+      const [propts, responceMsg, transformedURLs, speak_property_name] =
+        await get_properties(JSON.parse(last_search), page + 1);
       properties = propts;
       noFound = responceMsg;
       ans = responceMsg;
@@ -387,16 +387,15 @@ async function getPropertySearch(req, res, toolCall) {
           });
         }
 
-        const [propts, responceMsg,transformedURLs] = await get_properties(
-          reponcedata,
-          (pageNo = 1)
-        );
+        const [propts, responceMsg, transformedURLs, speak_property_name] =
+          await get_properties(reponcedata, (page1 = 1), req, res);
 
         properties = propts;
         noFound = responceMsg;
         ans = responceMsg ? responceMsg : reponcedata.answer;
         page1 = 1;
-        moreproperties_url =transformedURLs;
+        speak_property_names = speak_property_name;
+        moreproperties_url = transformedURLs;
       } else {
         const data = await extractJSON(result1);
 
@@ -404,11 +403,23 @@ async function getPropertySearch(req, res, toolCall) {
           message: data ? data[0]?.answer : result1,
           properties: [],
           chat_id: "",
-          moreproperties_url:moreproperties_url
+          moreproperties_url: moreproperties_url,
         };
         res.write(JSON.stringify(response));
         ans = data ? data[0]?.answer : result1;
       }
+    }
+    const numberOfPopularProperties = 3;
+    const popularProperties = speak_property_names.slice(
+      0,
+      numberOfPopularProperties
+    );
+ 
+    // Include property names in the AI answer
+    if (popularProperties?.length > 0) {
+      ans += `Some of Most Popular Properties in ${
+        toolCall?.location
+      }: ${popularProperties.join(", ")}`;
     }
 
     const lastOne = await Histories.create({
@@ -428,15 +439,19 @@ async function getPropertySearch(req, res, toolCall) {
       attributes: ["id", "text", "properties"],
     });
     properties = JSON.parse(lastChat.properties);
-     let message = ans.replace("AI:", "");
+    let message = ans.replace("AI:", "");
     let chat_id = lastChat.id;
-    res.status(200).end(JSON.stringify({ message, properties, chat_id ,moreproperties_url}));
+    res
+      .status(200)
+      .end(
+        JSON.stringify({ message, properties, chat_id, moreproperties_url })
+      );
     return;
   } catch (error) {
-     res.status(200).end(JSON.stringify({ error: error?.message }));
+    res.status(200).end(JSON.stringify({ error: error?.message }));
   }
 }
-const get_properties = async (paramters, pageNo) => {
+const get_properties = async (paramters, pageNo, req, res) => {
   const { location, bedrooms, bathrooms, price, min_price, max_price } =
     paramters;
   let page = pageNo;
@@ -478,33 +493,39 @@ const get_properties = async (paramters, pageNo) => {
   let maxRetries = 1;
   let cityIndex = 0;
   let transformedURLs;
-
+  let speak_property_name = [];
   if (numberpara >= 1) {
     do {
-      const urlLink = `https://gowpnow.com/api-site/search/realTimeListings?page=${page}&pageSize=10&isSearching=true&condition=${JSON.stringify(parameter)}`;
-       result = await axios.get(urlLink);
+      const urlLink = `https://gowpnow.com/api-site/search/realTimeListings?page=${page}&pageSize=10&isSearching=true&condition=${JSON.stringify(
+        parameter
+      )}`;
+      result = await axios.get(urlLink);
       if (result.data && result.data.listings.length > 0) {
         resData = result.data.listings;
-         transformedURLs = result.data.listings?.map((data) => {
+        transformedURLs = result.data.listings?.map((data) => {
           const urlParts = data?.detailLink?.split("?");
           if (urlParts.length === 2) {
             const queryParams = urlParts[1];
             const newURL = `https://gowpnow.com/listing?${queryParams}`;
+            speak_property_name.push(data?.address);
             return newURL;
           }
-          return null;
+           return null;
         });
 
         responceMsg = "";
       } else {
-         const get_locations = await axios.get(
+        const get_locations = await axios.get(
           `https://gowpnow.com/api-site/search/suggestions/listing/location?key=${parameter.location.city}&siteId=37314`
         );
-        const jsonData = get_locations?.data;
-        maxRetries = get_locations?.data?.length;
-         if (jsonData && jsonData.length > 0) {
+         const jsonData = get_locations?.data;
+ 
+        if (jsonData[cityIndex]?.list?.[0]?.value != undefined) { 
+          maxRetries = get_locations?.data?.length;
+        }
+        if (jsonData && jsonData.length > 0) {
           const selectedCity = jsonData[cityIndex]?.list?.[0]?.value;
-           if (selectedCity) {
+          if (selectedCity) {
             parameter.location.city = [selectedCity];
             cityIndex++;
 
@@ -515,18 +536,18 @@ const get_properties = async (paramters, pageNo) => {
               }
             });
           }
-         }
+        }
         retryCount++;
         if (retryCount >= maxRetries) {
-           // responceMsg = "Properties were not found within this criteria.";
+          await normalChat(req, res);
+          // responceMsg = "Properties were not found within this criteria.";
           break;
         }
       }
-     } while (result?.data?.listings?.length === 0);
-    
+    } while (result?.data?.listings?.length === 0);
   }
-  const single_more_property = transformedURLs ? transformedURLs[0]:""
-   return [resData, responceMsg,single_more_property];
+  const single_more_property = transformedURLs ? transformedURLs[0] : "";
+  return [resData, responceMsg, single_more_property, speak_property_name];
 };
 
 const extractJSON = (str) => {

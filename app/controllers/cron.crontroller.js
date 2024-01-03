@@ -29,10 +29,7 @@ const twilio = require("twilio");
 exports.randomQuestion = async () => {
   try {
     let setTime = moment().add(-360, "minutes").format("YYYY-MM-DD HH:mm:ss");
-    console.log(
-      setTime,
-      "randomQuestionrandomQuestionrandomQuestionrandomQuestionrandomQuestion"
-    );
+
     User.findOne({
       where: {
         device_id: {
@@ -55,7 +52,6 @@ exports.randomQuestion = async () => {
       .then(async (user) => {
         if (user) {
           const [ques, history_type] = await remindQue(user?.id);
-          console.log(ques, "quesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesques");
           var payload = {
             notification: {
               body: ques,
@@ -184,10 +180,6 @@ const remindQue = async (user_id) => {
       input: `create 1 conversational questions or comments in  10 words or less that end with “let’s chat”… the prompts should be encouraging or motivating and always kind, empathetic and inviting. The objective is to invite the respondent to start a conversation`,
     });
     const ques = res1.response?.replace("Comment: ", "");
-    console.log(
-      ques,
-      "quesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesquesques"
-    );
     return [ques, history_type];
   } catch (error) {
     return error?.message;
@@ -269,10 +261,10 @@ exports.cronJobSMS = async () => {
   let setTime = moment().add(+30, "minutes").format("YYYY-MM-DD HH:mm:ss");
   const { phone, sid, tkn } = await verifytwillio();
   const client = twilio(sid, tkn);
-  const reminders = await sequelize.query(
+   const reminders = await sequelize.query(
     `SELECT reminders.id as id, user_id,msg, phone,reminders.datetime as reminder_datetime FROM reminders LEFT JOIN notifications ON notifications.userId = reminders.user_id WHERE reminders.status = 1 AND sms = 1 AND notifications.datetime = reminders.datetime AND (reminders.datetime >= '${current}' AND reminders.datetime <= '${setTime}')`
   ); 
-   if (reminders[0].length > 0) {
+    if (reminders[0].length > 0) {
     await Promise.all(
       reminders[0]?.map(async (item) => {
          client.messages
@@ -282,7 +274,7 @@ exports.cronJobSMS = async () => {
             to: `+${item.phone}`,
           })
           .then(async (call) => {
-             await Notification.update(
+              await Notification.update(
               { sms: 0 },
               {
                 where: {
